@@ -1,7 +1,9 @@
 import type { ToolName } from "@pipeai/shared";
 import { getSupabase } from "../db/client.js";
 import { logger } from "../lib/logger.js";
+import { sendSMS } from "../lib/twilio.js";
 import { insertEmergency } from "../agents/dispatch/emergency.js";
+import { bookingConfirmationSMS } from "../prompts/messages.js";
 import type { ToolDefinition } from "../orchestration/types.js";
 
 export const scheduleJobTool: ToolDefinition = {
@@ -86,6 +88,16 @@ export const scheduleJobTool: ToolDefinition = {
 
     logger.info({ jobId: job.id, customerId }, "Job scheduled");
 
+    // Look up business info for SMS templates
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("name, phone")
+      .eq("id", businessId)
+      .single();
+
+    const businessName = business?.name ?? "Your plumber";
+    const businessPhone = business?.phone ?? "";
+
     // If emergency, immediately dispatch a tech
     const isEmergency = (input.is_emergency as boolean) ?? false;
     let emergencyDispatch = null;
@@ -96,20 +108,54 @@ export const scheduleJobTool: ToolDefinition = {
       emergencyDispatch = dispatchResult;
 
       if (dispatchResult.success && dispatchResult.techPhone) {
-        // TODO: Send SMS to tech via Twilio
-        logger.info(
-          { techName: dispatchResult.techName, techPhone: dispatchResult.techPhone },
-          "Emergency tech dispatched (SMS pending Twilio)",
+        // Notify tech of emergency dispatch
+        await sendSMS(
+          dispatchResult.techPhone,
+          `🚨 EMERGENCY DISPATCH — ${businessName}\n` +
+          `Customer: ${input.customer_name}\n` +
+          `Address: ${input.address}\n` +
+          `Issue: ${input.job_type}${input.notes ? " — " + input.notes : ""}\n` +
+          `Head there ASAP. Reply CONFIRM when en route.`,
         );
       }
 
       if (dispatchResult.success) {
-        // TODO: Send ETA SMS to customer via Twilio
-        logger.info(
-          { customerId, techName: dispatchResult.techName },
-          "Customer ETA notification pending (Twilio)",
+        // Send confirmation to customer with tech info
+        await sendSMS(
+          input.customer_phone as string,
+          `${businessName}: We're sending ${dispatchResult.techName ?? "a technician"} ` +
+          `to you right away for your ${input.job_type}. ` +
+          `They'll be there as soon as possible. Hang tight!`,
         );
       }
+    } else {
+      // Standard booking — send confirmation SMS to customer
+      const startDate = new Date(input.scheduled_start as string);
+      const dateStr = startDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const timeStr = startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+      // Look up tech name if assigned
+      let techName = "a technician";
+      if (input.tech_id) {
+        const { data: tech } = await supabase
+          .from("technicians")
+          .select("name")
+          .eq("id", input.tech_id as string)
+          .single();
+        if (tech) techName = tech.name;
+      }
+
+      const confirmationMsg = bookingConfirmationSMS({
+        customerFirstName: (input.customer_name as string).split(" ")[0],
+        businessName,
+        jobType: input.job_type as string,
+        scheduledDate: dateStr,
+        scheduledTime: timeStr,
+        techName,
+        businessPhone,
+      });
+
+      await sendSMS(input.customer_phone as string, confirmationMsg);
     }
 
     return {

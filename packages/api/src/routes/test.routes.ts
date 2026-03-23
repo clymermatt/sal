@@ -427,10 +427,29 @@ export async function registerTestRoutes(app: FastifyInstance): Promise<void> {
         }),
       });
 
+      // Send SMS to each tech
+      const { sendSMS } = await import("../lib/twilio.js");
+      const smsSent: Array<{ to: string; success: boolean }> = [];
+
+      for (const tech of techs ?? []) {
+        const briefing = briefings.find((b) => b.tech === tech.name);
+        if (briefing && tech.phone) {
+          const result = await sendSMS(tech.phone, briefing.message);
+          smsSent.push({ to: tech.name, success: result.success });
+        }
+      }
+
+      // Send owner briefing
+      if (business.owner_cell) {
+        const result = await sendSMS(business.owner_cell, ownerBriefing);
+        smsSent.push({ to: "owner", success: result.success });
+      }
+
       return {
         success: true,
         tech_briefings: briefings,
         owner_briefing: ownerBriefing,
+        sms_sent: smsSent,
       };
     },
   );
