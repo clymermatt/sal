@@ -122,7 +122,7 @@ export default function Home() {
         </p>
         <div className="mt-8">
           <a
-            href="mailto:matt@hiresal.com"
+            href="mailto:contact@hiresal.com"
             className="inline-block bg-blue-600 text-white text-lg font-semibold px-8 py-4 rounded-lg hover:bg-blue-700 transition"
           >
             Get Early Access
@@ -134,7 +134,7 @@ export default function Home() {
       <footer className="border-t px-6 py-10 text-center text-sm text-gray-500">
         <p>&copy; {new Date().getFullYear()} Sal. All rights reserved.</p>
         <p className="mt-2">
-          <a href="mailto:matt@hiresal.com" className="underline">
+          <a href="mailto:contact@hiresal.com" className="underline">
             matt@hiresal.com
           </a>
         </p>
