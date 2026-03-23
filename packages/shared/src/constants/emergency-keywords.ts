@@ -1,0 +1,17 @@
+export const EMERGENCY_KEYWORDS = [
+  "burst",
+  "flooding",
+  "no water",
+  "sewage",
+  "gas smell",
+  "overflowing",
+  "ceiling leak",
+  "pipe broke",
+  "emergency",
+  "water everywhere",
+  "sewer backup",
+  "no hot water",
+  "gas leak",
+  "frozen pipe",
+  "water main break",
+] as const;

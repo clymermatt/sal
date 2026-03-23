@@ -1,0 +1,13 @@
+{
+  "name": "pipeai",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @pipeai/api dev",
+    "build": "pnpm --filter @pipeai/shared build && pnpm --filter @pipeai/api build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
