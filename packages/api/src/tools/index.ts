@@ -15,6 +15,7 @@ import {
   sendPaymentRequestTool,
   getArSummaryTool,
 } from "./revenue.tools.js";
+import { sendEmailTool } from "./email.tools.js";
 import { toolRegistry } from "../orchestration/tool-registry.js";
 
 export function registerAllTools(): void {
@@ -32,4 +33,6 @@ export function registerAllTools(): void {
   toolRegistry.register(createInvoiceTool);
   toolRegistry.register(sendPaymentRequestTool);
   toolRegistry.register(getArSummaryTool);
+  // Email
+  toolRegistry.register(sendEmailTool);
 }

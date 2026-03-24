@@ -14,6 +14,7 @@ import { DispatchAgent } from "./agents/dispatch/dispatch.agent.js";
 import { RevenueAgent } from "./agents/revenue/revenue.agent.js";
 import { logger } from "./lib/logger.js";
 import { initTwilio } from "./lib/twilio.js";
+import { initEmail } from "./lib/email.js";
 
 async function main() {
   const config = loadConfig();
@@ -42,6 +43,13 @@ async function main() {
     initTwilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN, config.TWILIO_PHONE_NUMBER);
   } else {
     logger.warn("Twilio credentials not set — SMS sending disabled");
+  }
+
+  // Resend (optional in development)
+  if (config.RESEND_API_KEY) {
+    initEmail(config.RESEND_API_KEY);
+  } else {
+    logger.warn("RESEND_API_KEY not set — email sending disabled");
   }
 
   // Register tools and agents
