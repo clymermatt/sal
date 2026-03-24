@@ -13,6 +13,7 @@ import { IntakeAgent } from "./agents/intake/intake.agent.js";
 import { DispatchAgent } from "./agents/dispatch/dispatch.agent.js";
 import { RevenueAgent } from "./agents/revenue/revenue.agent.js";
 import { CustomerAgent } from "./agents/customer/customer.agent.js";
+import { IntelligenceAgent } from "./agents/intelligence/intelligence.agent.js";
 import { logger } from "./lib/logger.js";
 import { initTwilio } from "./lib/twilio.js";
 import { initEmail } from "./lib/email.js";
@@ -59,6 +60,7 @@ async function main() {
   agentRegistry.register(new DispatchAgent());
   agentRegistry.register(new RevenueAgent());
   agentRegistry.register(new CustomerAgent());
+  agentRegistry.register(new IntelligenceAgent());
 
   // Create Fastify server
   const app = Fastify({

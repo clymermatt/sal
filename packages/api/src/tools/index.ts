@@ -16,6 +16,7 @@ import {
   getArSummaryTool,
 } from "./revenue.tools.js";
 import { sendEmailTool } from "./email.tools.js";
+import { getJobCostsTool } from "./intelligence.tools.js";
 import { toolRegistry } from "../orchestration/tool-registry.js";
 
 export function registerAllTools(): void {
@@ -35,4 +36,6 @@ export function registerAllTools(): void {
   toolRegistry.register(getArSummaryTool);
   // Email
   toolRegistry.register(sendEmailTool);
+  // Intelligence
+  toolRegistry.register(getJobCostsTool);
 }
