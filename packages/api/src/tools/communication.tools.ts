@@ -258,6 +258,6 @@ function formatAlertMessage(input: Record<string, unknown>): string {
     `Caller: ${(input.caller_name as string) || "Unknown"} (${input.caller_phone})`,
     `Address: ${(input.address as string) || "Not yet collected"}`,
     `Issue: ${input.issue_description}`,
-    `Aria is on the line with them now.`,
+    `Sal is on the line with them now.`,
   ].join("\n");
 }

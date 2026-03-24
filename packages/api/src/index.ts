@@ -11,6 +11,7 @@ import { registerAllTools } from "./tools/index.js";
 import { agentRegistry } from "./orchestration/agent-registry.js";
 import { IntakeAgent } from "./agents/intake/intake.agent.js";
 import { DispatchAgent } from "./agents/dispatch/dispatch.agent.js";
+import { RevenueAgent } from "./agents/revenue/revenue.agent.js";
 import { logger } from "./lib/logger.js";
 import { initTwilio } from "./lib/twilio.js";
 
@@ -47,6 +48,7 @@ async function main() {
   registerAllTools();
   agentRegistry.register(new IntakeAgent());
   agentRegistry.register(new DispatchAgent());
+  agentRegistry.register(new RevenueAgent());
 
   // Create Fastify server
   const app = Fastify({

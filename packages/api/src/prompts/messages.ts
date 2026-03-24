@@ -122,7 +122,7 @@ export function ownerEmergencyAlertSMS(params: {
     `Caller: ${params.callerName} (${params.callerPhone})\n` +
     `Address: ${params.address}\n` +
     `Issue: ${params.issueDescription}\n` +
-    `Aria is on the line with them now.`
+    `Sal is on the line with them now.`
   );
 }
 
