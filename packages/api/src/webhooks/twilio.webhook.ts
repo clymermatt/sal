@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "node:crypto";
+import Twilio from "twilio";
 import type { PipeAIEvent } from "@pipeai/shared";
 import { handleEvent } from "../orchestration/event-router.js";
 import { logger } from "../lib/logger.js";
@@ -12,7 +13,18 @@ export async function registerTwilioWebhook(app: FastifyInstance): Promise<void>
 
     logger.info({ from, to }, "Twilio SMS received");
 
-    // TODO: Verify Twilio webhook signature
+    // Verify Twilio webhook signature
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (authToken) {
+      const signature = request.headers["x-twilio-signature"] as string;
+      const url = `${request.protocol}://${request.hostname}${request.url}`;
+      const valid = Twilio.validateRequest(authToken, signature, url, body);
+
+      if (!valid) {
+        logger.warn({ from, to }, "Invalid Twilio webhook signature");
+        return reply.status(403).send("<Response></Response>");
+      }
+    }
 
     // Look up business by PipeAI number
     const supabase = getSupabase();
@@ -42,7 +54,7 @@ export async function registerTwilioWebhook(app: FastifyInstance): Promise<void>
       logger.error({ err, eventId: event.id }, "Failed to process Twilio event");
     });
 
-    // Empty TwiML = no auto-reply (PipeAI handles responses via API)
+    // Empty TwiML = no auto-reply (Sal handles responses via API)
     return reply
       .status(200)
       .header("Content-Type", "text/xml")

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import type { PipeAIEvent } from "@pipeai/shared";
 import { handleEvent } from "../orchestration/event-router.js";
 import { logger } from "../lib/logger.js";
@@ -11,7 +11,18 @@ export async function registerVapiWebhook(app: FastifyInstance): Promise<void> {
 
     logger.info({ type: messageType?.type }, "Vapi webhook received");
 
-    // TODO: Verify Vapi webhook signature
+    // Verify Vapi webhook signature
+    const secret = process.env.VAPI_WEBHOOK_SECRET;
+    if (secret) {
+      const signature = request.headers["x-vapi-signature"] as string;
+      const rawBody = JSON.stringify(request.body);
+      const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+
+      if (signature !== expected) {
+        logger.warn("Invalid Vapi webhook signature");
+        return reply.status(403).send({ error: "Invalid signature" });
+      }
+    }
 
     // Normalize to PipeAIEvent
     const event: PipeAIEvent = {

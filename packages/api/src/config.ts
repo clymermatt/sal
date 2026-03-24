@@ -22,8 +22,12 @@ const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_PHONE_NUMBER: z.string().optional(),
 
+  // Twilio
+  TWILIO_WEBHOOK_SECRET: z.string().optional(),
+
   // Vapi
   VAPI_API_KEY: z.string().optional(),
+  VAPI_WEBHOOK_SECRET: z.string().optional(),
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
