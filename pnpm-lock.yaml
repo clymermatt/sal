@@ -6,11 +6,7 @@ settings:
 
 importers:
 
-  .:
-    dependencies:
-      resend:
-        specifier: ^6.9.4
-        version: 6.9.4
+  .: {}
 
   packages/api:
     dependencies:
@@ -44,6 +40,9 @@ importers:
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
+      resend:
+        specifier: ^6.9.4
+        version: 6.9.4
       stripe:
         specifier: ^20.4.1
         version: 20.4.1(@types/node@22.19.15)
