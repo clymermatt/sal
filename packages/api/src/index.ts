@@ -24,10 +24,16 @@ async function main() {
   // Redis + BullMQ are optional in development
   if (config.REDIS_URL) {
     initRedis(config);
-    initQueues(config);
-    logger.info("Redis + BullMQ initialized");
+    const { eventQueue } = initQueues(config);
+    // Connect publisher to queue
+    const { setEventQueue } = await import("./jobs/event-publisher.js");
+    setEventQueue(eventQueue);
+    // Start worker to process queued events
+    const { startEventWorker } = await import("./jobs/processors/event.processor.js");
+    startEventWorker(config.REDIS_URL);
+    logger.info("Redis + BullMQ initialized (queue + worker)");
   } else {
-    logger.warn("REDIS_URL not set — BullMQ background jobs disabled");
+    logger.warn("REDIS_URL not set — downstream events will process inline");
   }
 
   // Twilio (optional in development)

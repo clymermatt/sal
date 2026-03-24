@@ -1,6 +1,7 @@
 import type { PipeAIEvent } from "@pipeai/shared";
 import { getSupabase } from "../db/client.js";
 import { logger } from "../lib/logger.js";
+import { publishEvent } from "../jobs/event-publisher.js";
 import { logAction, getRecentHistory } from "./action-log.js";
 import { agentRegistry } from "./agent-registry.js";
 import { classifyIntent } from "./intent-classifier.js";
@@ -46,8 +47,8 @@ export async function handleEvent(event: PipeAIEvent): Promise<void> {
 
   // Step 7: Process downstream trigger events
   for (const trigger of result.triggerEvents) {
-    log.info({ trigger: trigger.type }, "Queuing downstream event");
-    // TODO: push to BullMQ event queue with optional delay
+    log.info({ triggerType: trigger.type, delay: trigger.delay ?? 0 }, "Publishing downstream event");
+    await publishEvent(trigger, event.businessId);
   }
 }
 
