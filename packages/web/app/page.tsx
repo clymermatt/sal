@@ -135,7 +135,7 @@ export default function Home() {
         <p>&copy; {new Date().getFullYear()} Sal. All rights reserved.</p>
         <p className="mt-2">
           <a href="mailto:contact@hiresal.com" className="underline">
-            matt@hiresal.com
+            contact@hiresal.com
           </a>
         </p>
       </footer>
