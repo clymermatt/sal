@@ -99,7 +99,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           `id, job_type, address, scheduled_start, estimated_mins,
            is_emergency, status, notes, tech_id, hold_reason, hold_blocker, flat_rate,
            customers!inner(name, phone),
-           technicians(name)`,
+           technicians(name),
+           quotes(id, total, status)`,
           { count: "exact" },
         )
         .eq("business_id", businessId)

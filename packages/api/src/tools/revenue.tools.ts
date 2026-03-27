@@ -22,6 +22,10 @@ export const createQuoteTool: ToolDefinition = {
         type: "boolean",
         description: "Whether to send the quote to the customer via SMS (default true)",
       },
+      auto_approve: {
+        type: "boolean",
+        description: "Set to true when the customer has already agreed to the price on the call. Marks the quote as approved immediately.",
+      },
     },
     required: ["customer_id", "job_type"],
   },
@@ -114,6 +118,9 @@ export const createQuoteTool: ToolDefinition = {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 14);
 
+    const autoApprove = (input.auto_approve as boolean) === true;
+    const status = hasCustomItems ? "open" : autoApprove ? "approved" : "sent";
+
     const { data: quote, error: quoteError } = await supabase
       .from("quotes")
       .insert({
@@ -123,6 +130,9 @@ export const createQuoteTool: ToolDefinition = {
         line_items: lineItems,
         total,
         expires_at: expiresAt.toISOString(),
+        status,
+        approved_at: autoApprove && !hasCustomItems ? new Date().toISOString() : null,
+        source: "agent",
       })
       .select("id")
       .single();

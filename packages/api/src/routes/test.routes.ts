@@ -453,4 +453,11 @@ export async function registerTestRoutes(app: FastifyInstance): Promise<void> {
       };
     },
   );
+
+  // Run quote follow-up processor
+  app.post("/test/quote-followups", async () => {
+    const { processQuoteFollowups } = await import("../jobs/processors/quote-followup.processor.js");
+    const result = await processQuoteFollowups();
+    return { success: true, ...result };
+  });
 }
