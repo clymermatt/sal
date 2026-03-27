@@ -78,6 +78,20 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Debug: check if we can read auth_tokens at all
+  app.get(
+    "/debug-tokens",
+    async () => {
+      const { data, error } = await supabase
+        .from("auth_tokens")
+        .select("id, token, used_at, expires_at")
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      return { count: data?.length ?? 0, tokens: data?.map(t => ({ id: t.id, token_prefix: t.token.slice(0, 8), used: !!t.used_at, expires: t.expires_at })), error };
+    },
+  );
+
   // Verify magic link token → create session
   app.get(
     "/verify",
