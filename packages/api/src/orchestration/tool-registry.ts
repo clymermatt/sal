@@ -9,6 +9,7 @@ const TOOL_PERMISSIONS: ToolPermissions = {
     "send_sms",
     "make_call",
     "get_customer_history",
+    "put_job_on_hold",
   ],
   dispatch: [
     "schedule_job",
@@ -18,6 +19,8 @@ const TOOL_PERMISSIONS: ToolPermissions = {
     "send_sms",
     "get_customer_history",
     "create_owner_alert",
+    "put_job_on_hold",
+    "clear_job_hold",
   ],
   revenue: [
     "create_quote",
@@ -34,6 +37,8 @@ const TOOL_PERMISSIONS: ToolPermissions = {
     "send_sms",
     "send_email",
     "get_customer_history",
+    "create_owner_alert",
+    "clear_job_hold",
   ],
   intelligence: [
     "get_customer_history",

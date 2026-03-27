@@ -17,6 +17,7 @@ import { IntelligenceAgent } from "./agents/intelligence/intelligence.agent.js";
 import { logger } from "./lib/logger.js";
 import { initTwilio } from "./lib/twilio.js";
 import { initEmail } from "./lib/email.js";
+import { initMaps } from "./lib/maps.js";
 
 async function main() {
   const config = loadConfig();
@@ -52,6 +53,13 @@ async function main() {
     initEmail(config.RESEND_API_KEY);
   } else {
     logger.warn("RESEND_API_KEY not set — email sending disabled");
+  }
+
+  // Google Maps (optional)
+  if (config.GOOGLE_MAPS_API_KEY) {
+    initMaps(config.GOOGLE_MAPS_API_KEY);
+  } else {
+    logger.warn("GOOGLE_MAPS_API_KEY not set — dispatch will use skills + workload only");
   }
 
   // Register tools and agents

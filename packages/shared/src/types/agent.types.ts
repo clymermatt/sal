@@ -42,4 +42,6 @@ export type ToolName =
   | "create_owner_alert"
   | "update_business_context"
   | "get_ar_summary"
-  | "log_upsell_prompt";
+  | "log_upsell_prompt"
+  | "put_job_on_hold"
+  | "clear_job_hold";

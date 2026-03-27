@@ -1,5 +1,6 @@
 import { getSupabase } from "../../db/client.js";
 import { logger } from "../../lib/logger.js";
+import { getDriveTimes } from "../../lib/maps.js";
 
 interface TechWithJobs {
   id: string;
@@ -40,6 +41,54 @@ export async function buildDailySchedule(
   const dayStart = `${dateStr}T00:00:00`;
   const dayEnd = `${dateStr}T23:59:59`;
 
+  // First: find return visits — priority rebooks and scheduled returns pinned to their tech
+  const { data: returnVisits } = await supabase
+    .from("jobs")
+    .select(`
+      id, job_type, required_skills, address, scheduled_start,
+      estimated_mins, is_emergency, tech_id, hold_reason,
+      customers!inner(name)
+    `)
+    .eq("business_id", businessId)
+    .eq("status", "return_scheduled")
+    .not("tech_id", "is", null);
+
+  // Also find scheduling_overflow jobs (tech ran out of time yesterday)
+  const { data: overflowJobs } = await supabase
+    .from("jobs")
+    .select(`
+      id, job_type, required_skills, address, scheduled_start,
+      estimated_mins, is_emergency, tech_id, hold_reason,
+      customers!inner(name)
+    `)
+    .eq("business_id", businessId)
+    .eq("status", "on_hold")
+    .eq("hold_reason", "scheduling_overflow")
+    .not("tech_id", "is", null);
+
+  const allReturns = [...(returnVisits ?? []), ...(overflowJobs ?? [])];
+
+  // Track which techs have return visits (they go first in the morning)
+  const techReturnVisits = new Map<string, string>(); // techId → job address
+  for (const rv of allReturns) {
+    if (rv.tech_id && rv.address) {
+      techReturnVisits.set(rv.tech_id, rv.address);
+
+      // Auto-move scheduling_overflow to return_scheduled
+      if (rv.hold_reason === "scheduling_overflow") {
+        await supabase
+          .from("jobs")
+          .update({ status: "return_scheduled" })
+          .eq("id", rv.id);
+      }
+
+      logger.info(
+        { techId: rv.tech_id, jobId: rv.id, address: rv.address, reason: rv.hold_reason },
+        "Tech has return visit — pinning as first job",
+      );
+    }
+  }
+
   // Get unassigned jobs for the date
   const { data: unassignedJobs } = await supabase
     .from("jobs")
@@ -64,7 +113,7 @@ export async function buildDailySchedule(
   // Get active technicians
   const { data: techs } = await supabase
     .from("technicians")
-    .select("id, name, phone, skills")
+    .select("id, name, phone, skills, last_known_address")
     .eq("business_id", businessId)
     .eq("is_active", true);
 
@@ -91,7 +140,8 @@ export async function buildDailySchedule(
 
   const techsWithLoad: TechWithJobs[] = techs.map((t) => ({
     ...t,
-    jobCount: techJobCounts.get(t.id) ?? 0,
+    // Count assigned jobs + return visits as workload
+    jobCount: (techJobCounts.get(t.id) ?? 0) + (techReturnVisits.has(t.id) ? 1 : 0),
   }));
 
   // Assign each job to the best tech
@@ -104,10 +154,34 @@ export async function buildDailySchedule(
       customer_name: (raw.customers as unknown as { name: string })?.name ?? null,
     };
 
+    // Get drive times for this job's address
+    // If a tech has a return visit, their origin is that job site (not home)
+    const driveTimes = new Map<string, number>();
+    if (job.address) {
+      const origins = techsWithLoad
+        .filter((t) => {
+          const returnAddr = techReturnVisits.get(t.id);
+          const homeAddr = (t as unknown as { last_known_address?: string }).last_known_address;
+          return returnAddr || homeAddr;
+        })
+        .map((t) => ({
+          techId: t.id,
+          address: techReturnVisits.get(t.id)
+            ?? (t as unknown as { last_known_address: string }).last_known_address,
+        }));
+
+      if (origins.length > 0) {
+        const times = await getDriveTimes(origins, job.address);
+        for (const t of times) {
+          driveTimes.set(t.techId, t.durationMins);
+        }
+      }
+    }
+
     const scored = techsWithLoad
       .map((tech) => ({
         tech,
-        score: scoreAssignment(job, tech),
+        score: scoreAssignment(job, tech, driveTimes.get(tech.id) ?? null),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -155,7 +229,7 @@ export async function buildDailySchedule(
  * - Workload balance (fewer jobs = higher score)
  * - Emergency bonus (emergency-skilled techs score higher for emergencies)
  */
-function scoreAssignment(job: UnassignedJob, tech: TechWithJobs): number {
+function scoreAssignment(job: UnassignedJob, tech: TechWithJobs, driveMins: number | null): number {
   let score = 0;
 
   // Skill match: required skills must be met
@@ -180,7 +254,25 @@ function scoreAssignment(job: UnassignedJob, tech: TechWithJobs): number {
     score += 20 - tech.jobCount * 3;
   }
 
+  // Drive time bonus — closer techs score higher (max 30 points)
+  if (driveMins !== null) {
+    score += Math.max(0, 30 - Math.round(driveMins * (30 / 60)));
+  }
+
   return Math.max(score, 0);
+}
+
+/**
+ * Update a tech's last known address when they complete a job.
+ * Called when job status changes to "complete".
+ */
+export async function updateTechLocation(techId: string, address: string): Promise<void> {
+  const supabase = getSupabase();
+  await supabase
+    .from("technicians")
+    .update({ last_known_address: address })
+    .eq("id", techId);
+  logger.info({ techId, address }, "Tech location updated");
 }
 
 /**

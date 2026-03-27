@@ -36,6 +36,7 @@ interface AddTechBody {
   name: string;
   phone: string;
   skills?: string[];
+  home_address?: string;
 }
 
 interface AddServiceBody {
@@ -122,7 +123,7 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
     "/:businessId/technicians",
     async (request: FastifyRequest<{ Params: { businessId: string }; Body: AddTechBody }>) => {
       const { businessId } = request.params;
-      const { name, phone, skills } = request.body;
+      const { name, phone, skills, home_address } = request.body;
 
       if (!name || !phone) {
         return { error: "name and phone are required" };
@@ -135,8 +136,9 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
           name,
           phone,
           skills: skills ?? ["general"],
+          last_known_address: home_address ?? null,
         })
-        .select("id, name, phone, skills")
+        .select("id, name, phone, skills, last_known_address")
         .single();
 
       if (error || !tech) {

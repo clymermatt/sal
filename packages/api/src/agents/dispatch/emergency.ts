@@ -1,5 +1,6 @@
 import { getSupabase } from "../../db/client.js";
 import { logger } from "../../lib/logger.js";
+import { getDriveTimes } from "../../lib/maps.js";
 
 interface EmergencyResult {
   success: boolean;
@@ -36,7 +37,7 @@ export async function insertEmergency(
   // Get active technicians
   const { data: techs } = await supabase
     .from("technicians")
-    .select("id, name, phone, skills")
+    .select("id, name, phone, skills, last_known_address")
     .eq("business_id", businessId)
     .eq("is_active", true);
 
@@ -60,6 +61,21 @@ export async function insertEmergency(
 
   const requiredSkills = job.required_skills ?? [];
 
+  // Get drive times if job has an address and techs have locations
+  const driveTimes = new Map<string, number>();
+  if (job.address) {
+    const origins = techs
+      .filter((t) => t.last_known_address)
+      .map((t) => ({ techId: t.id, address: t.last_known_address as string }));
+
+    if (origins.length > 0) {
+      const times = await getDriveTimes(origins, job.address);
+      for (const t of times) {
+        driveTimes.set(t.techId, t.durationMins);
+      }
+    }
+  }
+
   // Score and rank techs
   const candidates = techs
     .map((tech) => {
@@ -71,7 +87,7 @@ export async function insertEmergency(
           tech.skills.includes(s),
         ).length;
         if (matchCount === 0 && !tech.skills.includes("general")) {
-          return { tech, score: -1 }; // Can't do the job
+          return { tech, score: -1, driveMins: null }; // Can't do the job
         }
         score += matchCount * 20;
       }
@@ -84,9 +100,14 @@ export async function insertEmergency(
         score -= active * 25;
       }
 
-      // TODO: Factor in drive time via Google Maps Distance Matrix
+      // Drive time bonus — closer techs score higher (max 40 points)
+      const driveMins = driveTimes.get(tech.id) ?? null;
+      if (driveMins !== null) {
+        // 40 points for 0 min drive, 0 points for 60+ min
+        score += Math.max(0, 40 - Math.round(driveMins * (40 / 60)));
+      }
 
-      return { tech, score };
+      return { tech, score, driveMins };
     })
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score);

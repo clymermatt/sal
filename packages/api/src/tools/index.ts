@@ -17,6 +17,7 @@ import {
 } from "./revenue.tools.js";
 import { sendEmailTool } from "./email.tools.js";
 import { getJobCostsTool } from "./intelligence.tools.js";
+import { putJobOnHoldTool, clearJobHoldTool } from "./job-hold.tools.js";
 import { toolRegistry } from "../orchestration/tool-registry.js";
 
 export function registerAllTools(): void {
@@ -38,4 +39,7 @@ export function registerAllTools(): void {
   toolRegistry.register(sendEmailTool);
   // Intelligence
   toolRegistry.register(getJobCostsTool);
+  // Job holds
+  toolRegistry.register(putJobOnHoldTool);
+  toolRegistry.register(clearJobHoldTool);
 }
