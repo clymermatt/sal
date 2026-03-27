@@ -28,11 +28,12 @@ export const createQuoteTool: ToolDefinition = {
   async execute(input, businessId) {
     const supabase = getSupabase();
 
-    // Get service catalog
+    // Get active service catalog items only
     const { data: catalog } = await supabase
       .from("service_catalog")
       .select("id, job_type, flat_rate, duration_mins, category")
-      .eq("business_id", businessId);
+      .eq("business_id", businessId)
+      .eq("is_active", true);
 
     if (!catalog || catalog.length === 0) {
       return { success: false, error: "No service catalog found for this business" };

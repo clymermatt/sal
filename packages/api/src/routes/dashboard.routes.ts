@@ -368,6 +368,177 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     },
   );
 
+  // Quotes — including those needing manual pricing
+  app.get(
+    "/:businessId/quotes",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams;
+        Querystring: { needs_pricing?: string; page?: string; limit?: string };
+      }>,
+    ) => {
+      const { businessId } = request.params;
+      const page = parseInt(request.query.page ?? "1", 10);
+      const limit = parseInt(request.query.limit ?? "50", 10);
+      const offset = (page - 1) * limit;
+
+      let query = supabase
+        .from("quotes")
+        .select(
+          `id, line_items, total, expires_at, approved_at, created_at,
+           customers!inner(name, phone),
+           jobs(job_type)`,
+          { count: "exact" },
+        )
+        .eq("business_id", businessId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      const { data: quotes, count } = await query;
+
+      // Flag quotes that have CUSTOM items needing pricing
+      const enriched = (quotes ?? []).map((q) => {
+        const items = q.line_items as Array<{ serviceId: string; unitPrice: number | null }>;
+        const needsPricing = items.some((i) => i.serviceId === "CUSTOM" && i.unitPrice == null);
+        return { ...q, needs_pricing: needsPricing };
+      });
+
+      const filtered = request.query.needs_pricing === "true"
+        ? enriched.filter((q) => q.needs_pricing)
+        : enriched;
+
+      return {
+        quotes: filtered,
+        pagination: {
+          page,
+          limit,
+          total: count ?? 0,
+          pages: Math.ceil((count ?? 0) / limit),
+        },
+      };
+    },
+  );
+
+  // Update a quote's line items (for manual pricing)
+  app.put(
+    "/:businessId/quotes/:quoteId",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams & { quoteId: string };
+        Body: {
+          line_items: Array<{
+            serviceId: string;
+            description: string;
+            quantity: number;
+            unitPrice: number | null;
+            durationMins?: number;
+            notes?: string;
+          }>;
+        };
+      }>,
+    ) => {
+      const { businessId, quoteId } = request.params as { businessId: string; quoteId: string };
+      const { line_items } = request.body;
+
+      // Recalculate total
+      const total = line_items.reduce(
+        (sum, item) => sum + (item.unitPrice ?? 0) * (item.quantity ?? 1),
+        0,
+      );
+
+      const hasUnpriced = line_items.some((i) => i.unitPrice == null);
+
+      const { data: quote, error } = await supabase
+        .from("quotes")
+        .update({ line_items, total })
+        .eq("id", quoteId)
+        .eq("business_id", businessId)
+        .select("id, line_items, total")
+        .single();
+
+      if (error || !quote) {
+        return { error: "Failed to update quote", details: error };
+      }
+
+      return {
+        success: true,
+        quote,
+        fully_priced: !hasUnpriced,
+        message: hasUnpriced
+          ? "Quote updated but still has unpriced items"
+          : "Quote fully priced and ready to send",
+      };
+    },
+  );
+
+  // Send a quote to the customer (after pricing)
+  app.post(
+    "/:businessId/quotes/:quoteId/send",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams & { quoteId: string };
+      }>,
+    ) => {
+      const { businessId, quoteId } = request.params as { businessId: string; quoteId: string };
+
+      const { data: quote } = await supabase
+        .from("quotes")
+        .select("id, customer_id, total, line_items, job_id")
+        .eq("id", quoteId)
+        .eq("business_id", businessId)
+        .single();
+
+      if (!quote) return { error: "Quote not found" };
+
+      // Check all items are priced
+      const items = quote.line_items as Array<{ unitPrice: number | null }>;
+      if (items.some((i) => i.unitPrice == null)) {
+        return { error: "Cannot send quote with unpriced items" };
+      }
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("name, phone")
+        .eq("id", quote.customer_id)
+        .single();
+
+      const { data: business } = await supabase
+        .from("businesses")
+        .select("name")
+        .eq("id", businessId)
+        .single();
+
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("job_type")
+        .eq("id", quote.job_id)
+        .single();
+
+      if (customer?.phone) {
+        const { sendSMS } = await import("../lib/twilio.js");
+        const { quoteDeliverySMS } = await import("../prompts/messages.js");
+
+        await sendSMS(
+          customer.phone,
+          quoteDeliverySMS({
+            customerFirstName: customer.name.split(" ")[0],
+            businessName: business?.name ?? "Your plumber",
+            jobType: job?.job_type ?? "plumbing service",
+            totalAmount: Number(quote.total),
+            quoteUrl: `https://hiresal.com/quote/${quote.id}`,
+            expiryDays: 14,
+          }),
+        );
+      }
+
+      return {
+        success: true,
+        sent_to: customer?.phone,
+        total: quote.total,
+      };
+    },
+  );
+
   // Service catalog
   app.get(
     "/:businessId/catalog",
