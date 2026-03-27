@@ -384,4 +384,106 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       return { catalog: catalog ?? [] };
     },
   );
+
+  // Add a service to catalog
+  app.post(
+    "/:businessId/catalog",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams;
+        Body: {
+          job_type: string;
+          flat_rate: number;
+          duration_mins: number;
+          category: string;
+          description?: string;
+        };
+      }>,
+    ) => {
+      const { businessId } = request.params;
+      const { job_type, flat_rate, duration_mins, category, description } = request.body;
+
+      if (!job_type || flat_rate == null || !duration_mins || !category) {
+        return { error: "job_type, flat_rate, duration_mins, and category are required" };
+      }
+
+      const { data: service, error } = await supabase
+        .from("service_catalog")
+        .insert({
+          business_id: businessId,
+          job_type,
+          flat_rate,
+          duration_mins,
+          category,
+          description: description ?? null,
+        })
+        .select("id, job_type, flat_rate, duration_mins, category, description, is_active")
+        .single();
+
+      if (error || !service) {
+        return { error: "Failed to add service", details: error };
+      }
+
+      return { success: true, service };
+    },
+  );
+
+  // Update a service
+  app.put(
+    "/:businessId/catalog/:serviceId",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams & { serviceId: string };
+        Body: {
+          job_type?: string;
+          flat_rate?: number;
+          duration_mins?: number;
+          category?: string;
+          description?: string;
+          is_active?: boolean;
+        };
+      }>,
+    ) => {
+      const { businessId, serviceId } = request.params as { businessId: string; serviceId: string };
+      const updates = request.body;
+
+      const { data: service, error } = await supabase
+        .from("service_catalog")
+        .update(updates)
+        .eq("id", serviceId)
+        .eq("business_id", businessId)
+        .select("id, job_type, flat_rate, duration_mins, category, description, is_active")
+        .single();
+
+      if (error || !service) {
+        return { error: "Failed to update service", details: error };
+      }
+
+      return { success: true, service };
+    },
+  );
+
+  // Delete a service
+  app.delete(
+    "/:businessId/catalog/:serviceId",
+    async (
+      request: FastifyRequest<{
+        Params: DashboardParams & { serviceId: string };
+      }>,
+    ) => {
+      const { businessId, serviceId } = request.params as { businessId: string; serviceId: string };
+
+      const { error } = await supabase
+        .from("service_catalog")
+        .delete()
+        .eq("id", serviceId)
+        .eq("business_id", businessId);
+
+      if (error) {
+        return { error: "Failed to delete service", details: error };
+      }
+
+      return { success: true };
+    },
+  );
 }
