@@ -367,4 +367,21 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       };
     },
   );
+
+  // Service catalog
+  app.get(
+    "/:businessId/catalog",
+    async (request: FastifyRequest<{ Params: DashboardParams }>) => {
+      const { businessId } = request.params;
+
+      const { data: catalog } = await supabase
+        .from("service_catalog")
+        .select("id, job_type, description, flat_rate, duration_mins, category, is_active")
+        .eq("business_id", businessId)
+        .order("category")
+        .order("job_type");
+
+      return { catalog: catalog ?? [] };
+    },
+  );
 }
