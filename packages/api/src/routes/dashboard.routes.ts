@@ -142,11 +142,11 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
       let query = supabase
         .from("customers")
-        .select("id, name, phone, address, notes, lifetime_value, job_count, last_job_at, on_plan", {
+        .select("id, name, phone, address, notes, on_plan", {
           count: "exact",
         })
         .eq("business_id", businessId)
-        .order("last_job_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (search) {
@@ -155,8 +155,44 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
       const { data: customers, count } = await query;
 
+      // Calculate job_count and lifetime_value from actual jobs/invoices
+      const enriched = await Promise.all(
+        (customers ?? []).map(async (c) => {
+          const { count: jobCount } = await supabase
+            .from("jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("customer_id", c.id);
+
+          const { data: lastJob } = await supabase
+            .from("jobs")
+            .select("scheduled_start")
+            .eq("customer_id", c.id)
+            .order("scheduled_start", { ascending: false })
+            .limit(1)
+            .single();
+
+          const { data: paidInvoices } = await supabase
+            .from("invoices")
+            .select("total")
+            .eq("customer_id", c.id)
+            .eq("payment_status", "paid");
+
+          const lifetimeValue = (paidInvoices ?? []).reduce(
+            (sum, inv) => sum + Number(inv.total),
+            0,
+          );
+
+          return {
+            ...c,
+            job_count: jobCount ?? 0,
+            lifetime_value: lifetimeValue,
+            last_job_at: lastJob?.scheduled_start ?? null,
+          };
+        }),
+      );
+
       return {
-        customers: customers ?? [],
+        customers: enriched,
         pagination: {
           page,
           limit,
