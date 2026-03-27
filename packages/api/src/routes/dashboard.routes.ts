@@ -113,8 +113,23 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
       const { data: jobs, count } = await query;
 
+      // Fill in missing flat_rate from service catalog
+      const { data: catalog } = await supabase
+        .from("service_catalog")
+        .select("job_type, flat_rate")
+        .eq("business_id", businessId);
+
+      const catalogRates = new Map(
+        (catalog ?? []).map((c) => [c.job_type, c.flat_rate]),
+      );
+
+      const enrichedJobs = (jobs ?? []).map((job) => ({
+        ...job,
+        flat_rate: job.flat_rate ?? catalogRates.get(job.job_type) ?? null,
+      }));
+
       return {
-        jobs: jobs ?? [],
+        jobs: enrichedJobs,
         pagination: {
           page,
           limit,
